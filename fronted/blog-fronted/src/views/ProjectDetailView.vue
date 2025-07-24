@@ -4,6 +4,7 @@
     
     <main class="project-content">
       <div class="container">
+        <!-- 加载和错误状态 -->
         <div v-if="isLoading" class="loading-state">
           <div class="loading-spinner"></div>
           <p>加载项目信息...</p>
@@ -15,79 +16,82 @@
           <router-link to="/projects" class="back-button">返回项目列表</router-link>
         </div>
         
-        <article v-else class="project">
+        <!-- 项目内容 -->
+        <div v-else class="project-container">
+          <!-- 项目头部 -->
           <div class="project-header">
-            <div class="project-emoji">{{ project.emoji }}</div>
-            <h1 class="project-title">{{ project.title }}</h1>
-            
-            <div class="project-tags">
-              <span class="tag" v-for="tag in project.tags" :key="tag.id">
-                {{ tag.name }}
-              </span>
+            <div class="emoji-title-container">
+              <span class="project-emoji">{{ project.emoji }}</span>
+              <h1 class="project-title">{{ project.title }}</h1>
             </div>
             
-            <div class="project-stats">
-              <div class="stat">
-                <star-icon />
-                <span>{{ project.stars_count }} 星标</span>
+            <div class="project-meta">
+              <!-- 标签列表 -->
+              <div class="project-tags">
+                <span class="tag" v-for="tag in project.tags" :key="tag.id">{{ tag.name }}</span>
               </div>
-              <div class="stat">
-                <git-fork-icon />
-                <span>{{ project.forks_count }} 分支</span>
+              
+              <!-- 项目统计 -->
+              <div class="project-stats">
+                <div class="stat">
+                  <star-icon />
+                  <span>{{ formatStarCount(project.stars_count) }} 星标</span>
+                </div>
+                <div class="stat">
+                  <git-fork-icon />
+                  <span>{{ formatForkCount(project.forks_count) }} 分支</span>
+                </div>
               </div>
             </div>
             
+            <!-- 项目链接 -->
             <div class="project-links">
-              <a :href="project.github_url" target="_blank" rel="noopener noreferrer" class="github-link">
+              <a v-if="project.github_url" :href="project.github_url" target="_blank" rel="noopener noreferrer" class="link-button github-link">
                 <github-icon /> 查看源代码
               </a>
-              <a v-if="project.live_url" :href="project.live_url" target="_blank" rel="noopener noreferrer" class="demo-link">
+              <a v-if="project.live_url" :href="project.live_url" target="_blank" rel="noopener noreferrer" class="link-button demo-link">
                 <external-link-icon /> 在线演示
               </a>
             </div>
           </div>
           
-          <div class="project-image" v-if="project.image_url">
-            <img :src="project.image_url" :alt="project.title">
+          <!-- 项目图片 -->
+          <div v-if="project.image_url" class="project-image-container">
+            <img :src="project.image_url" :alt="project.title" class="project-image">
           </div>
           
-          <div class="project-body">
-            <div class="project-description">
-              {{ project.description }}
+          <!-- 项目描述 -->
+          <div class="project-content-section">
+            <h2 class="section-title">项目介绍</h2>
+            <div class="project-description markdown-content" v-html="formattedDescription"></div>
+          </div>
+          
+          <!-- 技术栈 -->
+          <div v-if="project.tags && project.tags.length > 0" class="project-content-section">
+            <h2 class="section-title">技术栈</h2>
+            <div class="tech-tags">
+              <div class="tech-tag" v-for="tag in project.tags" :key="tag.id">
+                {{ tag.name }}
+              </div>
             </div>
           </div>
-        </article>
-        
-        <!-- 相关项目 -->
-        <div class="related-projects" v-if="relatedProjects.length">
-          <h2>相关项目</h2>
-          <div class="projects-grid">
-            <div class="project-card" v-for="relatedProject in relatedProjects" :key="relatedProject.id">
-              <div class="card-emoji">{{ relatedProject.emoji }}</div>
-              <h3 class="card-title">{{ relatedProject.title }}</h3>
-              <p class="card-description">{{ relatedProject.description }}</p>
-              
-              <div class="card-tags">
-                <span class="tag" v-for="tag in relatedProject.tags" :key="tag.id">
-                  {{ tag.name }}
-                </span>
-              </div>
-              
-              <div class="card-footer">
-                <div class="card-stats">
-                  <div class="stat">
-                    <star-icon />
-                    <span>{{ relatedProject.stars_count }}</span>
-                  </div>
-                  <div class="stat">
-                    <git-fork-icon />
-                    <span>{{ relatedProject.forks_count }}</span>
-                  </div>
+          
+          <!-- 相关项目 -->
+          <div v-if="relatedProjects && relatedProjects.length > 0" class="project-content-section">
+            <h2 class="section-title">相关项目</h2>
+            <div class="related-projects">
+              <router-link 
+                v-for="relatedProject in relatedProjects" 
+                :key="relatedProject.id" 
+                :to="`/projects/${relatedProject.slug}`" 
+                class="related-project-card"
+              >
+                <div class="related-emoji">{{ relatedProject.emoji }}</div>
+                <div class="related-content">
+                  <h3 class="related-title">{{ relatedProject.title }}</h3>
+                  <p class="related-description">{{ truncateText(relatedProject.description, 80) }}</p>
                 </div>
-                <router-link :to="`/project/${relatedProject.slug}`" class="view-project">
-                  查看项目
-                </router-link>
-              </div>
+              </router-link>
             </div>
           </div>
         </div>
@@ -99,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { 
   Star as StarIcon,
@@ -110,6 +114,10 @@ import {
 import { projectsApi } from '@/api';
 import Navigation from '@/components/Navigation.vue';
 import SiteFooter from '@/components/SiteFooter.vue';
+import { marked } from 'marked';
+
+// 添加显示调试信息的标志
+const debug = ref(false);
 
 // 接口定义
 interface Tag {
@@ -139,7 +147,39 @@ const relatedProjects = ref<Project[]>([]);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
 
-// 获取项目数据
+// 截断文本方法
+const truncateText = (text: string, maxLength: number): string => {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+};
+
+// 格式化星标数量，确保显示为数字
+const formatStarCount = (value: any): number => {
+  if (value === null || value === undefined || value === '') return 0;
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+};
+
+// 格式化分支数量，确保显示为数字
+const formatForkCount = (value: any): number => {
+  if (value === null || value === undefined || value === '') return 0;
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+};
+
+// 将Markdown格式的描述转换为HTML
+const formattedDescription = computed(() => {
+  if (!project.value.description) return '';
+  try {
+    return marked(project.value.description);
+  } catch (e) {
+    console.error('解析Markdown失败:', e);
+    return project.value.description;
+  }
+});
+
+// 项目获取函数
 const fetchProject = async () => {
   const slug = route.params.slug as string;
   isLoading.value = true;
@@ -149,33 +189,49 @@ const fetchProject = async () => {
     console.log('正在获取项目详情:', slug);
     // 从API获取项目详情
     const projectResponse = await projectsApi.getProjectBySlug(slug);
-    console.log('项目详情响应:', projectResponse);
+    console.log('项目详情原始响应:', projectResponse.data);
     
     if (projectResponse.data) {
-      project.value = projectResponse.data;
-      console.log('项目详情:', project.value);
+      // 手动转换数值字段
+      const data = projectResponse.data;
+      
+      // 确保project.value是一个新对象
+      project.value = {
+        ...data,
+        // 强制转换数值字段
+        stars_count: Number(data.stars_count || 0),
+        forks_count: Number(data.forks_count || 0)
+      };
       
       // 如果项目有标签，获取相关项目
       if (project.value.tags && project.value.tags.length > 0) {
-        // 获取相关项目 - 使用第一个标签作为筛选条件
-        const tagSlug = project.value.tags[0].slug;
-        const relatedResponse = await projectsApi.getProjectsByTag(tagSlug, 2);
-        console.log('相关项目响应:', relatedResponse);
-        
-        if (relatedResponse.data) {
-          // 处理相关项目数据
-          if (Array.isArray(relatedResponse.data)) {
-            // 过滤掉当前项目
-            relatedProjects.value = relatedResponse.data
+        try {
+          // 获取相关项目 - 使用第一个标签作为筛选条件
+          const tagSlug = project.value.tags[0].slug;
+          const relatedResponse = await projectsApi.getProjectsByTag(tagSlug, 3);
+          
+          if (relatedResponse.data) {
+            // 处理相关项目数据
+            let relatedItems = [];
+            if (Array.isArray(relatedResponse.data)) {
+              relatedItems = relatedResponse.data;
+            } else if (relatedResponse.data.items && Array.isArray(relatedResponse.data.items)) {
+              relatedItems = relatedResponse.data.items;
+            }
+            
+            // 过滤掉当前项目，并确保数字字段被正确处理
+            relatedProjects.value = relatedItems
               .filter(p => p.id !== project.value.id)
-              .slice(0, 2);
-          } else if (relatedResponse.data.items && Array.isArray(relatedResponse.data.items)) {
-            // 过滤掉当前项目
-            relatedProjects.value = relatedResponse.data.items
-              .filter(p => p.id !== project.value.id)
-              .slice(0, 2);
+              .slice(0, 3)
+              .map(p => ({
+                ...p,
+                stars_count: Number(p.stars_count || 0),
+                forks_count: Number(p.forks_count || 0)
+              }));
           }
-          console.log(`加载了 ${relatedProjects.value.length} 个相关项目`);
+        } catch (relatedErr) {
+          console.error('获取相关项目失败:', relatedErr);
+          // 非致命错误，继续显示主项目
         }
       }
     } else {
@@ -183,18 +239,7 @@ const fetchProject = async () => {
     }
   } catch (err: any) {
     console.error('获取项目详情失败:', err);
-    if (err.response) {
-      console.error('错误状态码:', err.response.status);
-      console.error('错误详情:', err.response.data);
-      
-      if (err.response.status === 404) {
-        error.value = '找不到该项目';
-      } else {
-        error.value = '加载项目信息失败';
-      }
-    } else {
-      error.value = '网络错误，请稍后重试';
-    }
+    error.value = err.response?.status === 404 ? '找不到该项目' : '加载项目信息失败';
   } finally {
     isLoading.value = false;
   }
@@ -206,23 +251,149 @@ onMounted(() => {
 });
 </script>
 
+<style>
+/* 全局Markdown样式 - 不使用scoped以确保样式应用到v-html内容 */
+.markdown-content {
+  color: #94a3b8;
+  line-height: 1.8;
+  font-size: 1.05rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+  line-height: 1.4;
+}
+
+.markdown-content h1 {
+  font-size: 1.8rem;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+  padding-bottom: 0.5rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.6rem;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+  padding-bottom: 0.3rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.4rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.2rem;
+}
+
+.markdown-content p {
+  margin-bottom: 1.25rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-bottom: 1.25rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content ul li,
+.markdown-content ol li {
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content a {
+  color: #3b82f6;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.markdown-content a:hover {
+  border-bottom-color: #3b82f6;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #3b82f6;
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 1.25rem;
+  font-style: italic;
+  color: #94a3b8;
+}
+
+.markdown-content code {
+  background-color: rgba(99, 102, 241, 0.1);
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+}
+
+.markdown-content pre {
+  background-color: rgba(15, 23, 42, 0.8);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-bottom: 1.25rem;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  color: #e2e8f0;
+  font-family: monospace;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.25rem;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  padding: 0.5rem;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.markdown-content table th {
+  background-color: rgba(99, 102, 241, 0.1);
+  font-weight: 600;
+}
+</style>
+
 <style scoped>
 .project-detail {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: #0f172a;
+  color: #f8fafc;
 }
 
 .project-content {
   flex: 1;
-  padding: 7rem 0 4rem;
-  background-color: var(--color-background);
+  padding: 5rem 0;
 }
 
 .container {
+  width: 100%;
   max-width: 800px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 1.5rem;
 }
 
 /* 加载状态 */
@@ -232,13 +403,25 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: 4rem 0;
-  color: var(--color-text-muted);
 }
 
-.loading-state .loading-spinner {
+.loading-spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 3px solid rgba(59, 130, 246, 0.1);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
   margin-bottom: 1rem;
-  width: 2rem;
-  height: 2rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  color: #94a3b8;
+  font-size: 1.1rem;
 }
 
 /* 错误状态 */
@@ -248,261 +431,246 @@ onMounted(() => {
 }
 
 .error-state h2 {
-  color: var(--color-error);
+  color: #ef4444;
+  font-size: 1.75rem;
   margin-bottom: 1rem;
 }
 
 .error-state p {
-  color: var(--color-text-muted);
+  color: #94a3b8;
   margin-bottom: 2rem;
 }
 
 .back-button {
   display: inline-block;
-  padding: 0.75rem 1.5rem;
-  background: var(--color-primary);
+  background-color: #3b82f6;
   color: white;
+  padding: 0.75rem 1.5rem;
   border-radius: 0.5rem;
+  font-weight: 600;
   text-decoration: none;
   transition: all 0.3s;
 }
 
 .back-button:hover {
-  background: var(--color-secondary);
+  background-color: #2563eb;
   transform: translateY(-2px);
 }
 
-/* 项目样式 */
-.project {
-  animation: fadeIn 0.8s ease-out;
+/* 项目容器 */
+.project-container {
+  animation: fade-in 0.5s ease-out;
 }
 
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 项目头部 */
 .project-header {
-  margin-bottom: 2.5rem;
-  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.emoji-title-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .project-emoji {
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
+  font-size: 3rem;
+  line-height: 1;
 }
 
 .project-title {
   font-size: 2.5rem;
   font-weight: 800;
+  margin: 0;
+  color: #f8fafc;
+}
+
+.project-meta {
   margin-bottom: 1.5rem;
-  color: var(--color-text);
-  line-height: 1.2;
 }
 
 .project-tags {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .tag {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--color-primary);
-  padding: 0.25rem 0.75rem;
-  border-radius: 1rem;
-  font-size: 0.75rem;
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 0.3rem 0.8rem;
+  border-radius: 9999px;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
 .project-stats {
   display: flex;
-  justify-content: center;
   gap: 2rem;
-  margin-bottom: 1.5rem;
-  color: var(--color-text-muted);
+  margin-top: 1rem;
 }
 
 .stat {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  color: #94a3b8;
 }
 
 .stat svg {
   width: 1.25rem;
   height: 1.25rem;
-  color: var(--color-primary);
+  color: #3b82f6;
 }
 
 .project-links {
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
   gap: 1rem;
-  margin-bottom: 2rem;
 }
 
-.github-link, .demo-link {
+.link-button {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 1.25rem;
   border-radius: 0.5rem;
   font-weight: 600;
-  transition: all 0.3s;
   text-decoration: none;
+  transition: all 0.3s;
 }
 
 .github-link {
-  background: rgba(15, 23, 42, 0.8);
-  color: white;
+  background-color: rgba(15, 23, 42, 0.8);
+  color: #f8fafc;
 }
 
 .demo-link {
-  background: linear-gradient(90deg, #3b82f6, #6366f1);
+  background-color: #3b82f6;
   color: white;
 }
 
-.github-link:hover, .demo-link:hover {
+.link-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 项目图片 */
+.project-image-container {
+  margin-bottom: 2rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
 .project-image {
-  margin-bottom: 2.5rem;
-  border-radius: 0.75rem;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.project-image img {
   width: 100%;
   height: auto;
   display: block;
 }
 
-/* 项目内容 */
-.project-body {
-  color: var(--color-text-light);
-  font-size: 1.125rem;
-  line-height: 1.8;
+/* 内容区块 */
+.project-content-section {
+  margin-bottom: 3rem;
 }
 
-.project-description {
-  margin-bottom: 2rem;
-  font-size: 1.25rem;
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: #f8fafc;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+  padding-bottom: 0.75rem;
+}
+
+/* 技术标签 */
+.tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.tech-tag {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1));
+  color: #60a5fa;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.1);
 }
 
 /* 相关项目 */
 .related-projects {
-  margin-top: 4rem;
-  padding-top: 2rem;
-  border-top: 1px solid rgba(99, 102, 241, 0.1);
-}
-
-.related-projects h2 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  margin-bottom: 2rem;
-  color: var(--color-text);
-}
-
-.projects-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 2rem;
-}
-
-.project-card {
-  background: var(--color-surface);
-  border-radius: 0.75rem;
-  padding: 1.75rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  border: 1px solid rgba(99, 102, 241, 0.1);
-  display: flex;
-  flex-direction: column;
-  animation: fadeIn 1s ease-out;
-  animation-fill-mode: both;
-}
-
-.project-card:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.project-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-.card-emoji {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-}
-
-.card-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: 0.75rem;
-  color: var(--color-text);
-}
-
-.card-description {
-  color: var(--color-text-muted);
-  margin-bottom: 1.25rem;
-  flex-grow: 1;
-  line-height: 1.6;
-}
-
-.card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: auto;
-}
-
-.card-stats {
-  display: flex;
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 
-.view-project {
-  color: var(--color-primary);
-  font-weight: 600;
+.related-project-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background-color: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(99, 102, 241, 0.1);
   text-decoration: none;
-  transition: color 0.3s;
+  transition: all 0.3s;
 }
 
-.view-project:hover {
-  color: var(--color-secondary);
+.related-project-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background-color: rgba(30, 41, 59, 0.7);
 }
 
-@media (max-width: 768px) {
-  .project-content {
-    padding: 5rem 0 3rem;
+.related-emoji {
+  font-size: 2rem;
+}
+
+.related-content {
+  flex: 1;
+}
+
+.related-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: #f8fafc;
+}
+
+.related-description {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+  .project-title {
+    font-size: 2rem;
   }
   
-  .tech-list {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .projects-grid {
-    grid-template-columns: 1fr;
+  .project-emoji {
+    font-size: 2.5rem;
   }
   
   .project-links {
     flex-direction: column;
-    gap: 1rem;
   }
   
-  .github-link, .demo-link {
-    width: 100%;
-    justify-content: center;
+  .section-title {
+    font-size: 1.35rem;
   }
 }
 </style> 

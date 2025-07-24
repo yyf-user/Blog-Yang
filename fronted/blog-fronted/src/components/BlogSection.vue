@@ -37,7 +37,12 @@
             <p class="featured-article-excerpt">{{ featuredArticle.excerpt }}</p>
             
             <div class="article-tags">
-              <span class="tag" v-for="tag in featuredArticle.tags" :key="tag.id">
+              <span 
+                class="tag" 
+                v-for="tag in featuredArticle.tags" 
+                :key="tag.id"
+                @click.stop="navigateToTagArticles(tag.slug)"
+              >
                 {{ tag.name }}
               </span>
             </div>
@@ -72,7 +77,12 @@
               <p class="article-excerpt">{{ article.excerpt }}</p>
               
               <div class="article-tags">
-                <span class="tag" v-for="tag in article.tags" :key="tag.id">
+                <span 
+                  class="tag" 
+                  v-for="tag in article.tags" 
+                  :key="tag.id"
+                  @click.stop="navigateToTagArticles(tag.slug)"
+                >
                   {{ tag.name }}
                 </span>
               </div>
@@ -99,6 +109,14 @@
 import { ref, onMounted } from 'vue';
 import { Calendar as CalendarIcon, Clock as ClockIcon, ArrowRight as ArrowRightIcon } from 'lucide-vue-next';
 import { articlesApi } from '@/api';
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+
+// 标签导航功能
+const navigateToTagArticles = (tagSlug: string) => {
+  router.push(`/articles/tag/${tagSlug}`);
+};
 
 // 接口定义
 interface Tag {
@@ -411,6 +429,13 @@ onMounted(() => {
   border-radius: 1rem;
   font-size: 0.75rem;
   font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.tag:hover {
+  background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-2px);
 }
 
 .read-more {

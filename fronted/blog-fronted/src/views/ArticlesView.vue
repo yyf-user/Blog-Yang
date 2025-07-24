@@ -7,6 +7,14 @@
         <div class="articles-header">
           <h1 class="articles-title">我的<span class="text-gradient">博客</span></h1>
           <p class="articles-subtitle">探索我的技术文章、教程和心得体会</p>
+          
+          <!-- 调试信息，帮助排查问题 -->
+          <div v-if="debug" class="debug-info">
+            <p><strong>当前筛选:</strong> {{ selectedTags.length ? `标签ID: ${selectedTags[0]}` : '无标签筛选' }}</p>
+            <p><strong>标签列表:</strong> {{ tags.map(t => `${t.name}(${t.id})`) }}</p>
+            <p><strong>原文章数:</strong> {{ articles.length }}</p>
+            <p><strong>筛选后文章数:</strong> {{ filteredArticles.length }}</p>
+          </div>
         </div>
         
         <!-- 文章筛选和搜索 -->
@@ -28,6 +36,13 @@
           </div>
           
           <div class="tag-filters">
+            <span 
+              class="tag-filter"
+              :class="{ active: selectedTags.length === 0 }"
+              @click="clearTagFilters"
+            >
+              全部
+            </span>
             <span 
               v-for="tag in tags" 
               :key="tag.id" 
@@ -60,6 +75,7 @@
           </svg>
           <h3>没有找到相关文章</h3>
           <p>尝试使用其他关键词或清除筛选条件</p>
+          <button class="retry-button" @click="clearTagFilters">显示全部文章</button>
         </div>
         
         <div v-else class="articles-grid">
@@ -180,7 +196,9 @@ interface Article {
 
 // 状态
 const router = useRouter();
+const route = useRoute();
 const articles = ref<Article[]>([]);
+const allArticles = ref<Article[]>([]); // 存储所有文章，不受分页影响
 const isLoading = ref(true);
 const error = ref<string | null>(null);
 const searchQuery = ref('');
@@ -189,6 +207,7 @@ const currentPage = ref(1);
 const itemsPerPage = 6;
 const totalPages = ref(1);
 const totalArticles = ref(0);
+const debug = ref(true); // 调试模式，便于排查问题
 
 // 标签列表
 const tags = ref<Tag[]>([]);
@@ -199,21 +218,69 @@ const fetchTags = async () => {
   isTagsLoading.value = true;
   
   try {
+    console.log('开始获取标签数据...');
     const response = await tagsApi.getTags();
-    if (response.data) {
+    
+    if (response && response.data) {
       tags.value = response.data;
+      console.log(`成功获取 ${tags.value.length} 个标签:`, tags.value);
+    } else {
+      console.warn('获取标签返回空数据');
     }
   } catch (err) {
-    console.error('Failed to fetch tags:', err);
+    console.error('获取标签失败:', err);
   } finally {
     isTagsLoading.value = false;
   }
 };
 
-// 过滤文章
+// 强制本地筛选文章
+const applyLocalFilters = () => {
+  let filtered = [...allArticles.value];
+  
+  // 应用标签筛选
+  if (selectedTags.value.length > 0) {
+    const tagId = selectedTags.value[0];
+    filtered = filtered.filter(article => 
+      article.tags && article.tags.some(tag => tag.id === tagId)
+    );
+    console.log(`应用本地标签筛选 (ID: ${tagId})，结果: ${filtered.length} 篇文章`);
+  }
+  
+  // 应用搜索筛选
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase();
+    filtered = filtered.filter(article => 
+      article.title.toLowerCase().includes(query) || 
+      article.excerpt.toLowerCase().includes(query)
+    );
+    console.log(`应用本地搜索筛选 (关键词: ${query})，结果: ${filtered.length} 篇文章`);
+  }
+  
+  // 应用分页
+  const start = (currentPage.value - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  articles.value = filtered.slice(start, end);
+  
+  // 更新总页数
+  totalArticles.value = filtered.length;
+  totalPages.value = Math.max(1, Math.ceil(totalArticles.value / itemsPerPage));
+  
+  console.log(`分页结果: 第 ${currentPage.value}/${totalPages.value} 页，显示 ${articles.value.length} 篇文章`);
+};
+
+// 过滤文章的计算属性
 const filteredArticles = computed(() => {
   return articles.value;
 });
+
+// 清除所有标签筛选
+const clearTagFilters = () => {
+  console.log('清除所有标签筛选');
+  selectedTags.value = [];
+  router.push('/articles');
+  applyLocalFilters();
+};
 
 // 格式化日期
 const formatDate = (dateString: string): string => {
@@ -229,27 +296,33 @@ const formatDate = (dateString: string): string => {
 
 // 切换标签选择
 const toggleTag = (tagId: number) => {
-  const index = selectedTags.value.indexOf(tagId);
-  if (index === -1) {
-    selectedTags.value = [tagId]; // 只选择一个标签
-  } else {
-    selectedTags.value = [];
-  }
+  console.log(`点击标签ID: ${tagId}`);
+  
+  // 始终只保留一个标签
+  selectedTags.value = selectedTags.value.includes(tagId) ? [] : [tagId];
+  
+  // 重置页码
+  currentPage.value = 1;
   
   // 通过路由跳转到标签筛选页面
   const selectedTag = tags.value.find(tag => tag.id === tagId);
   if (selectedTag && selectedTags.value.length > 0) {
+    console.log(`跳转到标签筛选页面: ${selectedTag.slug}`);
     router.push(`/articles/tag/${selectedTag.slug}`);
   } else {
+    console.log('跳转到文章列表页');
     router.push('/articles');
   }
+  
+  // 立即应用本地筛选
+  applyLocalFilters();
 };
 
 // 切换页码
 const changePage = (page: number) => {
   currentPage.value = page;
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  fetchArticles();
+  applyLocalFilters(); // 本地分页
 };
 
 // 导航到文章详情页
@@ -259,160 +332,69 @@ const navigateToArticle = (slug: string) => {
 
 // 搜索文章
 const searchArticles = () => {
+  currentPage.value = 1; // 重置页码
+  
   if (searchQuery.value.trim()) {
     router.push(`/articles/search/${encodeURIComponent(searchQuery.value.trim())}`);
   } else {
     router.push('/articles');
   }
+  
+  // 立即应用本地筛选
+  applyLocalFilters();
 };
 
-// 获取文章数据
-const fetchArticles = async () => {
+// 获取所有文章数据（一次性获取所有文章）
+const fetchAllArticles = async () => {
   isLoading.value = true;
   error.value = null;
   
   try {
-    console.log('开始获取文章数据...');
+    console.log('获取所有文章数据...');
     
-    // 构建API请求参数
-    const params: any = {
+    const response = await articlesApi.getArticles({
       status: 'published',
-      skip: (currentPage.value - 1) * itemsPerPage,
-      limit: itemsPerPage
-    };
-    
-    // 添加标签筛选
-    if (selectedTags.value.length > 0) {
-      params.tag = selectedTags.value[0]; // 只使用第一个标签进行筛选
-      console.log(`按标签ID过滤: ${params.tag}`);
-    }
-    
-    // 添加搜索筛选
-    if (searchQuery.value.trim()) {
-      params.search = searchQuery.value.trim();
-      console.log(`搜索关键词: ${params.search}`);
-    }
-    
-    console.log('API请求参数:', params);
-    
-    // 获取文章列表
-    const response = await articlesApi.getArticles(params);
-    console.log('文章API响应:', response);
+      limit: 100 // 获取足够多的文章
+    });
     
     if (response.data) {
       if (Array.isArray(response.data)) {
-        articles.value = response.data;
-        console.log(`成功获取 ${articles.value.length} 篇文章`);
+        allArticles.value = response.data;
       } else if (response.data.items && Array.isArray(response.data.items)) {
-        articles.value = response.data.items;
-        console.log(`成功获取 ${articles.value.length} 篇文章 (分页数据)`);
-        
-        // 如果响应包含总数
-        if (response.data.total !== undefined) {
-          totalArticles.value = response.data.total;
-          console.log(`文章总数: ${totalArticles.value}`);
-        }
+        allArticles.value = response.data.items;
       } else {
-        console.warn('文章数据格式不符合预期:', response.data);
-        articles.value = [];
+        allArticles.value = [];
+        console.warn('文章数据格式不符合预期');
       }
       
-      // 获取文章总数（假设API返回了总数）
-      if (response.headers && response.headers['x-total-count']) {
-        totalArticles.value = parseInt(response.headers['x-total-count']);
-        console.log(`从响应头获取文章总数: ${totalArticles.value}`);
-      } else {
-        // 如果API没有返回总数，假设当前页面数量小于每页数量时，已经是最后一页
-        if (!totalArticles.value) {
-          totalArticles.value = articles.value.length < itemsPerPage ? 
-            (currentPage.value - 1) * itemsPerPage + articles.value.length : 
-            currentPage.value * itemsPerPage + 1;
-          console.log(`估计的文章总数: ${totalArticles.value}`);
-        }
-      }
+      console.log(`获取到 ${allArticles.value.length} 篇文章`);
       
-      // 计算总页数
-      totalPages.value = Math.ceil(totalArticles.value / itemsPerPage);
-      console.log(`总页数: ${totalPages.value}`);
-    } else {
-      console.warn('API响应没有data属性');
-      articles.value = [];
+      // 应用筛选和分页
+      applyLocalFilters();
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error('获取文章列表失败:', err);
-    if (err.response) {
-      console.error('错误状态码:', err.response.status);
-      console.error('错误详情:', err.response.data);
-    }
     error.value = '获取文章列表失败，请稍后再试';
     articles.value = [];
+    allArticles.value = [];
   } finally {
     isLoading.value = false;
   }
 };
 
-// 监听搜索输入框变化，添加防抖效果
-let searchTimeout: number | null = null;
+// 监听搜索输入框变化
 watch(searchQuery, () => {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout);
-  }
-  
-  searchTimeout = window.setTimeout(() => {
-    searchArticles();
-  }, 500);
+  // 当搜索关键词变化时，重新应用筛选
+  applyLocalFilters();
 });
 
-// 页面加载时获取数据
-onMounted(() => {
-  const route = useRoute();
-  
-  // 从路由参数中获取标签或搜索关键词
-  if (route.name === 'articles-by-tag' && route.params.tag) {
-    const tagSlug = route.params.tag as string;
-    console.log('按标签过滤:', tagSlug);
-    
-    // 找到对应的标签ID
-    const foundTag = tags.value.find(tag => tag.slug === tagSlug);
-    if (foundTag) {
-      selectedTags.value = [foundTag.id];
-    } else {
-      // 如果标签尚未加载，先获取标签
-      isTagsLoading.value = true;
-      tagsApi.getTags().then(response => {
-        if (response.data) {
-          tags.value = response.data;
-          const matchedTag = response.data.find(tag => tag.slug === tagSlug);
-          if (matchedTag) {
-            selectedTags.value = [matchedTag.id];
-          }
-        }
-        isTagsLoading.value = false;
-        fetchArticles();
-      }).catch(err => {
-        console.error('获取标签失败:', err);
-        isTagsLoading.value = false;
-        fetchArticles();
-      });
-      return;
-    }
-  } else if (route.name === 'articles-search' && route.params.query) {
-    const query = route.params.query as string;
-    searchQuery.value = decodeURIComponent(query);
-    console.log('搜索关键词:', searchQuery.value);
-  }
-  
-  // 获取标签和文章数据
-  fetchTags();
-  fetchArticles();
-});
-
-// 路由变化时重新获取数据
-const route = useRoute();
+// 监听路由变化
 watch(
   () => route.path,
-  () => {
-    // 路由变化时重置页码
+  (newPath) => {
+    console.log(`路由变化: ${newPath}`);
+    
+    // 重置页码
     currentPage.value = 1;
     
     // 根据路由类型设置过滤条件
@@ -422,19 +404,50 @@ watch(
       if (foundTag) {
         selectedTags.value = [foundTag.id];
         searchQuery.value = '';
+        console.log(`根据路由设置标签筛选: ${foundTag.name} (ID: ${foundTag.id})`);
       }
     } else if (route.name === 'articles-search' && route.params.query) {
       searchQuery.value = decodeURIComponent(route.params.query as string);
       selectedTags.value = [];
+      console.log(`根据路由设置搜索筛选: ${searchQuery.value}`);
     } else {
       // 普通文章列表，清除所有过滤
       selectedTags.value = [];
       searchQuery.value = '';
     }
     
-    fetchArticles();
-  }
+    // 应用筛选
+    applyLocalFilters();
+  },
+  { immediate: true }
 );
+
+// 页面加载时获取数据
+onMounted(async () => {
+  console.log('组件挂载，当前路由:', route.name, route.params);
+  
+  // 先获取标签
+  await fetchTags();
+  
+  // 从路由参数中获取标签或搜索关键词
+  if (route.name === 'articles-by-tag' && route.params.tag) {
+    const tagSlug = route.params.tag as string;
+    console.log('按标签过滤:', tagSlug);
+    
+    const foundTag = tags.value.find(tag => tag.slug === tagSlug);
+    if (foundTag) {
+      selectedTags.value = [foundTag.id];
+      console.log(`找到匹配的标签: ${foundTag.name}`);
+    }
+  } else if (route.name === 'articles-search' && route.params.query) {
+    const query = route.params.query as string;
+    searchQuery.value = decodeURIComponent(query);
+    console.log('搜索关键词:', searchQuery.value);
+  }
+  
+  // 获取所有文章数据并本地筛选
+  await fetchAllArticles();
+});
 </script>
 
 <style scoped>
@@ -813,5 +826,20 @@ watch(
     padding: 0.4rem 0.75rem;
     font-size: 0.8rem;
   }
+}
+
+/* 调试信息样式 */
+.debug-info {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+
+.debug-info p {
+  margin: 0.25rem 0;
 }
 </style> 

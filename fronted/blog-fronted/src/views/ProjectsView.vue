@@ -121,8 +121,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import Navigation from '@/components/Navigation.vue';
 import SiteFooter from '@/components/SiteFooter.vue';
 import { projectsApi, tagsApi } from '@/api'; // 导入API
@@ -150,6 +150,7 @@ interface Project {
 
 // 状态
 const router = useRouter();
+const route = useRoute();
 const projects = ref<Project[]>([]);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
@@ -173,9 +174,20 @@ const filteredProjects = computed(() => {
 const toggleTag = (tagId: number) => {
   const index = selectedTags.value.indexOf(tagId);
   if (index === -1) {
-    selectedTags.value.push(tagId);
+    selectedTags.value = [tagId]; // 只选择一个标签
+    
+    // 更新URL查询参数
+    const selectedTag = tags.value.find(tag => tag.id === tagId);
+    if (selectedTag) {
+      router.push({ 
+        path: '/projects',
+        query: { tag: selectedTag.slug } 
+      });
+    }
   } else {
-    selectedTags.value.splice(index, 1);
+    selectedTags.value = [];
+    // 清除URL查询参数
+    router.push({ path: '/projects' });
   }
 };
 
@@ -190,6 +202,16 @@ const fetchTags = async () => {
     const response = await tagsApi.getTags();
     tags.value = response.data || [];
     console.log('获取标签成功:', tags.value.length);
+    
+    // 检查URL参数，设置初始选中的标签
+    if (route.query.tag) {
+      const tagSlug = route.query.tag as string;
+      const foundTag = tags.value.find(tag => tag.slug === tagSlug);
+      if (foundTag) {
+        selectedTags.value = [foundTag.id];
+        console.log('从URL参数中选中标签:', foundTag.name);
+      }
+    }
   } catch (err: any) {
     console.error('获取标签失败:', err);
   }
@@ -244,12 +266,33 @@ const retryLoading = () => {
   fetchProjects();
 };
 
+// 监听路由查询参数变化
+watch(() => route.query, (newQuery) => {
+  if (newQuery.tag) {
+    const tagSlug = newQuery.tag as string;
+    const foundTag = tags.value.find(tag => tag.slug === tagSlug);
+    if (foundTag) {
+      selectedTags.value = [foundTag.id];
+    } else {
+      // 如果找不到标签，可能标签列表尚未加载完成
+      // 记录标签slug，稍后在fetchTags完成后处理
+      const pendingTagSlug = tagSlug;
+      fetchTags().then(() => {
+        const tag = tags.value.find(t => t.slug === pendingTagSlug);
+        if (tag) {
+          selectedTags.value = [tag.id];
+        }
+      });
+    }
+  } else {
+    selectedTags.value = [];
+  }
+}, { deep: true });
+
 // 页面加载时获取数据
 onMounted(async () => {
-  await Promise.all([
-    fetchTags(),
-    fetchProjects()
-  ]);
+  await fetchTags();
+  await fetchProjects();
 });
 </script>
 

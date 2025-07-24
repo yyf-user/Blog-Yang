@@ -23,12 +23,17 @@
         <div class="featured-project" v-if="featuredProject" @click="navigateToProject(featuredProject.slug)">
           <div class="featured-content">
             <h3 class="featured-title">
-              {{ featuredProject.emoji }} {{ featuredProject.title }}
+              {{ featuredProject.title }} {{ featuredProject.emoji }} 
             </h3>
-            <p class="featured-description">{{ featuredProject.description }}</p>
+            <p class="featured-description">{{ truncateText(featuredProject.description, 150) }}</p>
             
             <div class="project-tags">
-              <span class="project-tag" v-for="tag in featuredProject.tags" :key="tag.id">
+              <span 
+                class="project-tag" 
+                v-for="tag in featuredProject.tags" 
+                :key="tag.id"
+                @click.stop="navigateToTagProjects(tag.slug)"
+              >
                 {{ tag.name }}
               </span>
             </div>
@@ -63,10 +68,15 @@
           <div class="project-card" v-for="project in projects" :key="project.id" @click="navigateToProject(project.slug)">
             <div class="project-emoji">{{ project.emoji }}</div>
             <h4 class="project-title">{{ project.title }}</h4>
-            <p class="project-description">{{ project.description }}</p>
+            <p class="project-description">{{ truncateText(project.description, 100) }}</p>
             
             <div class="project-tags">
-              <span class="project-tag" v-for="tag in project.tags" :key="tag.id">
+              <span 
+                class="project-tag" 
+                v-for="tag in project.tags" 
+                :key="tag.id"
+                @click.stop="navigateToTagProjects(tag.slug)"
+              >
                 {{ tag.name }}
               </span>
             </div>
@@ -148,6 +158,18 @@ const error = ref<string | null>(null);
 // 导航到项目详情页
 const navigateToProject = (slug: string) => {
   router.push(`/projects/${slug}`);
+};
+
+// 导航到标签筛选页面
+const navigateToTagProjects = (tagSlug: string) => {
+  router.push(`/projects?tag=${tagSlug}`);
+};
+
+// 截断文本，添加省略号
+const truncateText = (text: string, maxLength: number): string => {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
 };
 
 // 获取项目数据
@@ -453,6 +475,14 @@ onMounted(() => {
   border-radius: 1rem;
   font-size: 0.75rem;
   font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.project-tag:hover {
+  background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3);
 }
 
 .project-meta {
