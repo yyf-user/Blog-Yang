@@ -8,22 +8,26 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     API_V1_STR: str = "/api"
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+    SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     # BACKEND_CORS_ORIGINS is a JSON-formatted list of origins
     # e.g: '["http://localhost", "http://localhost:4200", "http://localhost:3000"]'
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost", 
-        "http://localhost:8000", 
+        "http://localhost:8000",
+        "http://localhost:80",
         "http://127.0.0.1", 
-        "http://127.0.0.1:8000", 
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:80",
         "http://localhost:5173", 
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:4200",
         "http://127.0.0.1:4200",
+        "http://frontend",
+        "http://frontend:80",
         "*"
     ]
 

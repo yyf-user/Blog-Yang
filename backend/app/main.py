@@ -150,7 +150,9 @@ def create_app() -> FastAPI:
     return app
 
 
+# 创建应用实例
 app = create_app()
+
 
 # 如果直接运行此文件，则启动Uvicorn服务器
 if __name__ == "__main__":
@@ -172,7 +174,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8001,  # 修改端口为8001，避免冲突
         reload=True,
         log_level="error"  # 设置uvicorn日志级别为error，减少输出
     )

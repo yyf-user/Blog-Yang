@@ -385,6 +385,35 @@ const closeChat = () => {
   saveChatHistory();
 };
 
+// 打开聊天窗口
+const openChat = () => {
+  isOpen.value = true;
+  isMinimized.value = false;
+  
+  // 聊天窗口打开后，将焦点放到输入框
+  setTimeout(() => {
+    if (inputField.value) {
+      inputField.value.focus();
+    }
+  }, 100);
+  
+  // 添加调试消息
+  console.log('聊天窗口已打开');
+  
+  // 调试: 测试直接访问/api/chat端点
+  console.log('测试直接访问/api/chat端点');
+  fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      messages: [{ role: 'user', content: '你好' }] 
+    })
+  })
+  .then(r => r.json())
+  .then(d => console.log('测试结果:', d))
+  .catch(e => console.error('测试错误:', e));
+};
+
 // 发送消息
 const sendMessage = async () => {
   const content = userInput.value.trim();

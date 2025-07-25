@@ -1,0 +1,54 @@
+services:
+  # 前端服务（保持不变）
+  frontend:
+    build: 
+      context: ./fronted/blog-fronted
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - blog-network
+    restart: unless-stopped
+
+  # 后端服务（更新数据库连接信息）
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=mysql://root:123456@host.docker.internal:3306/blog  # 关键修改！
+      - SECRET_KEY=changethissecretkey
+      - ALLOW_ORIGINS=http://localhost,http://localhost:80,http://frontend
+    volumes:
+      - ./backend/app/uploads:/app/uploads
+    networks:
+      - blog-network
+    restart: unless-stopped
+
+  # 数据库服务（关键修改）
+  db:
+    image: mysql:5.7.16
+    environment:
+      - MYSQL_DATABASE=blog               # 数据库名称改为 blog
+      - MYSQL_USER=root                   # 用户名改为 root
+      - MYSQL_PASSWORD=123456             # 密码改为 123456
+      - MYSQL_ROOT_PASSWORD=123456        # 同步更新 root 密码
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/blog.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - blog-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  blog-network:
+    driver: bridge

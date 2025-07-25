@@ -1,0 +1,39 @@
+# Git相关
+.git
+.gitignore
+.github
+
+# 开发环境
+**/node_modules
+**/venv
+**/__pycache__
+**/.vscode
+**/.idea
+**/.DS_Store
+
+# 前端构建产物
+**/dist
+**/coverage
+**/logs
+**/.cache
+**/.temp
+
+# 后端文件
+**/venv
+**/.pytest_cache
+**/.coverage
+**/htmlcov
+
+# 数据库
+**/*.db
+**/*.sqlite
+
+# 临时文件
+**/tmp
+**/temp
+**/*.log
+
+# 文档
+**/README.md
+**/LICENSE
+**/*.md 

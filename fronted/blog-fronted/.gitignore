@@ -28,3 +28,13 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+# 忽略 docker-compose.yml
+docker-compose.yml
+
+# 忽略所有 .yml 配置文件
+*.yml
+
+# 或者忽略某个目录下的配置文件
+config/*.yml
+.env

@@ -22,6 +22,40 @@ DEEPSEEK_MODEL = "deepseek-chat"
 async_client = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
 
+# 处理根路径的POST请求，重定向到/message端点
+@router.post("")
+async def chat_root(
+    request: Request,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> Any:
+    """
+    处理根路径的请求，将其重定向到/message端点
+    """
+    # 解析请求体
+    try:
+        body = await request.json()
+        messages = body.get("messages", [])
+        
+        if not messages:
+            raise HTTPException(status_code=400, detail="消息列表不能为空")
+        
+        # 直接调用message端点的处理逻辑，不是函数本身
+        client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+        
+        response = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=messages,
+        )
+        
+        return {
+            "message": response.choices[0].message.content,
+            "role": response.choices[0].message.role,
+        }
+    except Exception as e:
+        logger.error(f"处理聊天请求时出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"处理请求失败: {str(e)}")
+
+
 # 处理OPTIONS预检请求
 @router.options("")
 @router.options("/stream")
