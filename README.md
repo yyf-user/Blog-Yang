@@ -1,5 +1,3 @@
-# 个人博客系统 - 全栈项目
-
 这是一个功能齐全的个人博客系统，采用前后端分离架构，包括Vue 3前端和FastAPI后端。本项目提供博客文章管理、项目展示、API统计、用户认证、实时聊天等功能。
 
 ## 项目概述
@@ -85,6 +83,14 @@ first-project/
     ├── main.py              # 入口文件
     └── requirements.txt     # 依赖项
 ```
+### 首页效果图片
+<img width="1401" height="955" alt="屏幕截图 2025-10-02 112006" src="https://github.com/user-attachments/assets/f4b2ce0d-d2ef-42d5-924f-79dae48eae60" />
+
+### 内容页面图片
+<img width="1800" height="962" alt="屏幕截图 2025-10-02 112026" src="https://github.com/user-attachments/assets/932bcc7b-f59c-4905-904f-f85e8fe33607" />
+
+### 后台管理页面图片
+<img width="1915" height="956" alt="屏幕截图 2025-10-02 112037" src="https://github.com/user-attachments/assets/c80b79ca-aa2c-4088-b5a9-139891e97f31" />
 
 ## 核心功能
 
